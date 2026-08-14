@@ -1,15 +1,24 @@
 import { useState } from "react";
+import { motion } from "framer-motion";
+import { Copy, Check, Terminal } from "lucide-react";
 
 function CopyBtn({ text }) {
   const [copied, setCopied] = useState(false);
-  const copy = async () => {
+  const copy = async (e) => {
+    e.stopPropagation();
     try { await navigator.clipboard.writeText(text); } catch { /**/ }
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
   return (
-    <button className={`btn-copy ${copied ? "copied" : ""}`} onClick={(e) => { e.stopPropagation(); copy(); }}>
-      {copied ? "✓ Copied" : "⎘ Copy"}
+    <button
+      className={`btn-icon ${copied ? "copied" : ""}`}
+      onClick={copy}
+      aria-label="Copy command"
+      title="Copy to clipboard"
+    >
+      {copied ? <Check size={12} strokeWidth={2.5} /> : <Copy size={12} strokeWidth={2} />}
+      {copied ? "Copied" : "Copy"}
     </button>
   );
 }
@@ -20,65 +29,86 @@ export default function FixList({ report }) {
   return (
     <div>
       <div className="section-hdr">
-        <div className="section-title"><span className="si">🔧</span> Prioritized Fix List</div>
-        <span style={{ color: "var(--text-3)", fontSize: "13px" }}>
-          {fixList.length} item{fixList.length !== 1 ? "s" : ""}
-        </span>
+        <div>
+          <h2 className="section-title">Priority Queue</h2>
+          <p style={{ color: "var(--text-3)", fontSize: "14px", marginTop: "4px" }}>
+            Ordered remediation steps for failed controls
+          </p>
+        </div>
+        <span className="section-subtitle">{fixList.length} items</span>
       </div>
 
       {fixList.length === 0 && (
-        <div className="card">
-          <div className="card-inner">
-            <div className="empty-state">
-              <div className="empty-icon">🎉</div>
-              <p style={{ fontSize: "16px", fontWeight: 700, color: "var(--green)", marginBottom: "6px" }}>Nothing to fix!</p>
-              <p>Every checked rule passed or was UNKNOWN.</p>
-            </div>
+        <div className="card" style={{ padding: "64px", textAlign: "center" }}>
+          <div style={{ fontSize: "32px", marginBottom: "16px" }}>✓</div>
+          <div style={{ fontSize: "18px", fontWeight: 700, color: "var(--text)", marginBottom: "8px" }}>
+            No issues to fix
+          </div>
+          <div style={{ color: "var(--text-3)", fontSize: "14px" }}>
+            Every checked rule passed or could not be verified.
           </div>
         </div>
       )}
 
-      {fixList.map((item) => (
-        <div className="fix-card" key={item.priority}>
-          <div className="fix-num">{item.priority}</div>
-          <div className="fix-body">
-            <div className="fix-meta">
-              <span className="fix-rule">{item.rule_id}</span>
-              {item.category && <span className="cat-chip">{item.category}</span>}
-            </div>
+      <div className="pq-list">
+        {fixList.map((item, i) => (
+          <motion.div
+            key={item.priority}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.2, ease: "easeOut", delay: i * 0.05 }}
+          >
+            <div className="pq-card">
+              <div className="pq-header">
+                <span className="pq-num">
+                  {String(item.priority).padStart(2, "0")}
+                </span>
+                {item.category && (
+                  <span className="pq-sev">{item.category}</span>
+                )}
+              </div>
 
-            <p className="fix-finding">{item.finding}</p>
+              <div className="pq-rule-id">{item.rule_id}</div>
+              <h3 className="pq-title">
+                {item.finding?.split(":")[0] || item.rule_id}
+              </h3>
 
-            {item.why_it_matters && (
-              <p className="fix-why">
-                <strong style={{ color: "var(--text)" }}>Why it matters: </strong>
-                {item.why_it_matters}
-              </p>
-            )}
+              {item.finding && (
+                <p className="pq-finding">{item.finding}</p>
+              )}
 
-            {item.fix_command && (
-              <div className="terminal">
-                <div className="terminal-header">
-                  <div className="terminal-dots">
-                    <span /><span /><span />
+              {item.why_it_matters && (
+                <p className="pq-why">{item.why_it_matters}</p>
+              )}
+
+              {item.fix_command && (
+                <div className="terminal">
+                  <div className="terminal-bar">
+                    <div className="terminal-dots">
+                      <span /><span /><span />
+                    </div>
+                    <div className="terminal-label">
+                      <Terminal size={10} strokeWidth={2} style={{ display: "inline", marginRight: "5px" }} />
+                      bash
+                    </div>
+                    <CopyBtn text={item.fix_command} />
                   </div>
-                  <div className="terminal-title">bash</div>
-                  <CopyBtn text={item.fix_command} />
+                  <div className="terminal-body">
+                    <span className="terminal-prompt">$</span>
+                    {item.fix_command}
+                  </div>
                 </div>
-                <div className="terminal-body">
-                  <span className="terminal-prompt">$</span>{item.fix_command}
-                </div>
-              </div>
-            )}
+              )}
 
-            {item.evidence_ref && (
-              <div style={{ marginTop: "10px", fontSize: "11px", color: "var(--text-3)", fontFamily: "var(--mono)" }}>
-                Evidence ref: <span style={{ color: "var(--cyan)" }}>{item.evidence_ref}</span>
-              </div>
-            )}
-          </div>
-        </div>
-      ))}
+              {item.evidence_ref && (
+                <div style={{ marginTop: "14px", fontSize: "11px", color: "var(--text-3)", fontFamily: "var(--mono)" }}>
+                  Evidence: {item.evidence_ref}
+                </div>
+              )}
+            </div>
+          </motion.div>
+        ))}
+      </div>
     </div>
   );
 }

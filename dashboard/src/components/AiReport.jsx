@@ -1,8 +1,9 @@
 import { useRef, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Bot, Copy, Check, Download, RefreshCw } from "lucide-react";
 
-const STATUS_ICON  = { PASS: "✅", FAIL: "⛔", UNKNOWN: "❓" };
-const STATUS_LABEL = { PASS: "Passed", FAIL: "Failed", UNKNOWN: "Unknown" };
 const STATUS_ORDER = ["FAIL", "UNKNOWN", "PASS"];
+const STATUS_LABEL = { PASS: "Passed", FAIL: "Failed", UNKNOWN: "Unknown" };
 const MODEL        = "nvidia/nemotron-3-super-120b-a12b";
 
 function CopyBtn({ text }) {
@@ -13,30 +14,24 @@ function CopyBtn({ text }) {
     setTimeout(() => setCopied(false), 2000);
   };
   return (
-    <button className={`btn-copy ${copied ? "copied" : ""}`} onClick={copy}>
-      {copied ? "✓ Copied" : "⎘ Copy"}
+    <button className={`btn-icon ${copied ? "copied" : ""}`} onClick={copy} aria-label="Copy">
+      {copied ? <Check size={12} strokeWidth={2.5} /> : <Copy size={12} strokeWidth={2} />}
+      {copied ? "Copied" : "Copy"}
     </button>
   );
-}
-
-function riskColor(s) {
-  if (s >= 75) return "#f87171";
-  if (s >= 50) return "#fb923c";
-  if (s >= 25) return "#fbbf24";
-  return "#34d399";
 }
 
 function exportMD(result, report) {
   const lines = [];
   lines.push("# AI Security Remediation Report\n");
-  lines.push(`**Target:** ${report.target || "—"}  \n**Transport:** ${report.transport || "—"}  \n**Model:** ${result.model || MODEL}  \n**Risk Score:** ${result.risk_score ?? "—"}/100\n`);
+  lines.push(`**Target:** ${report.target || "—"}  \n**Model:** ${result.model || MODEL}  \n**Risk Score:** ${result.risk_score ?? "—"}/100\n`);
   lines.push(`## Executive Summary\n\n${result.executive_summary}\n`);
   const grouped = {};
   (result.items || []).forEach((it) => { (grouped[it.status] = grouped[it.status] || []).push(it); });
   STATUS_ORDER.forEach((st) => {
     const g = grouped[st] || [];
     if (!g.length) return;
-    lines.push(`## ${STATUS_ICON[st]} ${STATUS_LABEL[st]} (${g.length})\n`);
+    lines.push(`## ${STATUS_LABEL[st]} (${g.length})\n`);
     g.forEach((it) => {
       lines.push(`### ${it.rule_id}\n\n${it.finding}\n`);
       if (it.why_it_matters) lines.push(`**Why:** ${it.why_it_matters}\n`);
@@ -51,12 +46,13 @@ function exportMD(result, report) {
 }
 
 export default function AiReport({ report }) {
-  const [loading,   setLoading]   = useState(false);
-  const [thinking,  setThinking]  = useState("");
-  const [result,    setResult]    = useState(null);
-  const [error,     setError]     = useState("");
+  const [loading,  setLoading]  = useState(false);
+  const [thinking, setThinking] = useState("");
+  const [result,   setResult]   = useState(null);
+  const [error,    setError]    = useState("");
   const thinkRef = useRef(null);
 
+  // ── All API/streaming logic unchanged ──────────────────────────────────────
   const run = async () => {
     setLoading(true); setError(""); setResult(null); setThinking("");
     try {
@@ -68,11 +64,9 @@ export default function AiReport({ report }) {
           summary: report.summary, findings: report.findings, fix_list: report.fix_list,
         }),
       });
-
       const reader = res.body.getReader();
       const dec    = new TextDecoder();
       let buf = "";
-
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
@@ -107,72 +101,79 @@ export default function AiReport({ report }) {
 
   return (
     <div>
-      {/* Hero CTA (shown before generation) */}
+      {/* CTA hero */}
       {!result && !loading && (
-        <div className="ai-hero" style={{ marginBottom: "20px" }}>
-          <span className="ai-hero-icon">🤖</span>
+        <div className="ai-hero">
+          <div className="ai-hero-icon">
+            <Bot size={22} strokeWidth={1.5} />
+          </div>
           <h2 className="ai-hero-title">AI Remediation Report</h2>
           <p className="ai-hero-sub">
-            Nemotron-3-Super-120B will analyse every finding — PASS, FAIL and UNKNOWN —
-            and return plain-English guidance, risk ratings, and exact fix commands.
+            Analyse every finding with Nemotron‑3‑Super‑120B and receive
+            plain-English guidance, risk ratings, and exact fix commands
+            for all PASS, FAIL, and UNKNOWN controls.
           </p>
-          <div className="ai-model-tag">✦ {MODEL}</div>
+          <div className="ai-model-tag">
+            <Bot size={11} strokeWidth={2} />
+            {MODEL}
+          </div>
           <br />
-          {error && <div className="error-banner" style={{ maxWidth: "500px", margin: "0 auto 16px" }}>⚠️ {error}</div>}
-          <button className="btn btn-primary" onClick={run} disabled={loading} id="gen-ai-btn">
-            🚀 Generate AI Report
+          {error && (
+            <div className="error-msg" style={{ maxWidth: "480px", margin: "0 auto 20px" }}>
+              {error}
+            </div>
+          )}
+          <button className="btn-scan" onClick={run} disabled={loading} id="gen-ai-btn">
+            Generate AI Report
           </button>
         </div>
       )}
 
-      {/* Loading */}
+      {/* Loading state */}
       {loading && (
-        <div className="card" style={{ marginBottom: "16px" }}>
-          <div className="card-inner">
-            <div className="ai-loading-wrap">
-              <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "16px" }}>
-                <span style={{ fontSize: "20px", animation: "aiFloat 1.5s ease-in-out infinite" }}>🤖</span>
-                <span style={{ color: "var(--text-2)", fontSize: "14px" }}>Nemotron is analysing your audit report…</span>
-              </div>
-              <div className="ai-progress">
-                <div className="ai-progress-bar" style={{ width: "100%" }} />
-              </div>
-              {thinking && (
-                <div className="ai-thinking-panel">
-                  <div className="ai-thinking-hdr">
-                    <div className="think-pulse" />
-                    Reasoning in progress
-                  </div>
-                  <div className="ai-thinking-text" ref={thinkRef}>{thinking}</div>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.2 }}
+        >
+          <div className="ai-progress"><div className="ai-progress-fill" /></div>
 
-      {/* Error (after attempt) */}
-      {error && result === null && !loading && (
-        <div className="error-banner">⚠️ {error}
-          <button className="btn btn-ghost btn-sm" style={{ marginLeft: "auto" }} onClick={run}>Retry</button>
-        </div>
+          <div style={{ textAlign: "center", color: "var(--text-3)", fontSize: "14px", marginBottom: "20px", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}>
+            <RefreshCw size={14} style={{ animation: "spin 1s linear infinite" }} />
+            Analysing {(report.findings || []).length} findings…
+          </div>
+
+          {thinking && (
+            <div className="ai-thinking-panel">
+              <div className="ai-thinking-label">
+                <div className="ai-thinking-dot" />
+                Reasoning
+              </div>
+              <div className="ai-thinking-text" ref={thinkRef}>{thinking}</div>
+            </div>
+          )}
+        </motion.div>
       )}
 
       {/* Results */}
       {result && (
-        <>
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.2, ease: "easeOut" }}
+        >
           {/* Executive summary */}
           {result.executive_summary && (
             <div className="exec-card">
-              <div className="exec-label">⚡ Executive Summary</div>
+              <div className="exec-label">Executive Summary</div>
               <p className="exec-text">{result.executive_summary}</p>
               {result.risk_score != null && (
                 <div className="risk-row">
                   <span className="risk-lbl">Risk Score</span>
                   <div className="risk-bar-wrap">
-                    <div className="risk-bar-fill" style={{ width: `${result.risk_score}%`, background: riskColor(result.risk_score) }} />
+                    <div className="risk-bar-fill" style={{ width: `${result.risk_score}%` }} />
                   </div>
-                  <span className="risk-score" style={{ color: riskColor(result.risk_score) }}>{result.risk_score}</span>
+                  <span className="risk-score">{result.risk_score}</span>
                   <span className="risk-max">/100</span>
                 </div>
               )}
@@ -186,56 +187,75 @@ export default function AiReport({ report }) {
             return (
               <div key={st}>
                 <div className="ai-group-hdr">
-                  {STATUS_ICON[st]} {STATUS_LABEL[st]} ({group.length})
+                  {STATUS_LABEL[st]} ({group.length})
                 </div>
-                {group.map((item) => (
-                  <div key={item.rule_id} className={`ai-item ai-${item.status}`}>
+                {group.map((item, i) => (
+                  <motion.div
+                    key={item.rule_id}
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.18, delay: i * 0.04 }}
+                    className={`ai-item ${item.status === "FAIL" ? "ai-item-fail" : ""} ${item.status === "UNKNOWN" ? "ai-item-unknown" : ""}`}
+                  >
                     <div className="ai-item-hdr">
-                      <span style={{ fontFamily: "var(--mono)", fontSize: "12px", color: "var(--cyan)" }}>{item.rule_id}</span>
-                      <span className={`badge b-${item.status?.toLowerCase()}`}>
-                        {STATUS_ICON[item.status]} {STATUS_LABEL[item.status] || item.status}
+                      <span className="ai-rule-id">{item.rule_id}</span>
+                      <span style={{ fontSize: "11px", color: "var(--text-3)", background: "var(--surface-2)", border: "1px solid var(--border)", padding: "2px 9px", borderRadius: "99px", fontFamily: "var(--mono)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                        {STATUS_LABEL[item.status]}
                       </span>
                       {item.severity_hint && (
-                        <span className={`sev-badge sev-${item.severity_hint}`}>{item.severity_hint}</span>
+                        <span style={{ fontSize: "10px", color: "var(--text-3)", fontFamily: "var(--mono)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                          {item.severity_hint}
+                        </span>
                       )}
                     </div>
+
                     <p className="ai-item-finding">{item.finding}</p>
+
                     {item.why_it_matters && (
                       <p className="ai-item-why">
-                        <strong style={{ color: "var(--text)" }}>
-                          {item.status === "PASS" ? "Why it's good: " : "Why it matters: "}
-                        </strong>
+                        <strong style={{ color: "var(--text-2)" }}>Why it matters: </strong>
                         {item.why_it_matters}
                       </p>
                     )}
+
                     {item.risk_assessment && (
-                      <p className="ai-item-risk">⚠️ <strong>Risk:</strong> {item.risk_assessment}</p>
+                      <p className="ai-item-risk">{item.risk_assessment}</p>
                     )}
+
                     {item.fix_command && (
-                      <div className="terminal">
-                        <div className="terminal-header">
+                      <div className="terminal" style={{ marginTop: "12px" }}>
+                        <div className="terminal-bar">
                           <div className="terminal-dots"><span /><span /><span /></div>
-                          <div className="terminal-title">remediation</div>
+                          <div className="terminal-label">remediation</div>
                           <CopyBtn text={item.fix_command} />
                         </div>
                         <div className="terminal-body">
-                          <span className="terminal-prompt">$</span>{item.fix_command}
+                          <span className="terminal-prompt">$</span>
+                          {item.fix_command}
                         </div>
                       </div>
                     )}
-                  </div>
+                  </motion.div>
                 ))}
               </div>
             );
           })}
 
-          {/* Footer actions */}
-          <div style={{ display: "flex", justifyContent: "space-between", marginTop: "20px", paddingTop: "16px", borderTop: "1px solid var(--border)" }}>
-            <button className="btn btn-ghost btn-sm" onClick={run} disabled={loading}>↺ Regenerate</button>
-            <button className="btn btn-ghost btn-sm" onClick={() => exportMD(result, report)}>⬇ Export .md</button>
+          {/* Footer */}
+          <div className="ai-footer">
+            <button className="btn-ghost" onClick={run} disabled={loading}>
+              <RefreshCw size={13} />
+              Regenerate
+            </button>
+            <button className="btn-ghost" onClick={() => exportMD(result, report)}>
+              <Download size={13} />
+              Export .md
+            </button>
           </div>
-        </>
+        </motion.div>
       )}
+
+      <style>{`@keyframes spin { from { transform:rotate(0deg) } to { transform:rotate(360deg) } }`}</style>
     </div>
   );
 }
