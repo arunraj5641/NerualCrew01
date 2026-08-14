@@ -1,45 +1,70 @@
-import { useState } from "react";
-
 export default function EvidencePanel({ report }) {
-  const [open, setOpen] = useState(false);
   const evidence = report.evidence || {};
+  const entries  = Object.entries(evidence);
+
+  if (entries.length === 0) {
+    return (
+      <section className="panel">
+        <div className="panel-head">
+          <span className="panel-title"><span className="title-icon">📋</span>Evidence Appendix</span>
+        </div>
+        <p style={{ color: "var(--text-muted)", textAlign: "center", padding: "32px" }}>
+          No evidence collected in this report.
+        </p>
+      </section>
+    );
+  }
 
   return (
     <section className="panel">
       <div className="panel-head">
-        <h2>Evidence Appendix</h2>
-        <button className="btn ghost" onClick={() => setOpen(!open)}>
-          {open ? "Collapse all" : `Expand all (${Object.keys(evidence).length} commands)`}
-        </button>
+        <span className="panel-title"><span className="title-icon">📋</span>Evidence Appendix</span>
+        <span style={{ color: "var(--text-dim)", fontSize: "13px" }}>
+          {entries.length} command{entries.length !== 1 ? "s" : ""} captured
+        </span>
       </div>
-      {!open && (
-        <p className="hint">
-          Raw command output captured from the target during the audit.
-        </p>
-      )}
-      {open &&
-        Object.entries(evidence).map(([cid, cc]) => (
-          <details className="evidence-item" key={cid}>
-            <summary>
-              <span className="mono">{cid}</span>
-              <span className="hint">
-                {cc.error
-                  ? `connector error: ${cc.error}`
-                  : `exit ${cc.exit_code}`}
-              </span>
-            </summary>
+
+      {entries.map(([cid, cc]) => (
+        <details key={cid} className="evidence-item">
+          <summary className="evidence-summary">
+            <span className="evidence-id">{cid}</span>
+            <span className="evidence-cmd">{cc.command}</span>
             {cc.error ? (
-              <p className="error-banner">Connector error: {cc.error}</p>
+              <span className="badge badge-fail" style={{ flexShrink: 0 }}>error</span>
+            ) : (
+              <span
+                className={`badge ${cc.exit_code === 0 ? "badge-pass" : "badge-fail"}`}
+                style={{ flexShrink: 0 }}
+              >
+                exit {cc.exit_code}
+              </span>
+            )}
+          </summary>
+
+          <div style={{ padding: "0 16px 14px" }}>
+            <div
+              style={{
+                fontSize: "11px",
+                color: "var(--text-muted)",
+                fontFamily: "var(--mono)",
+                marginBottom: "8px",
+              }}
+            >
+              $ {cc.command}
+            </div>
+
+            {cc.error ? (
+              <div className="error-banner">{cc.error}</div>
             ) : (
               <pre className="evidence-pre">
-                <code>
-                  {cc.stdout || "(empty)"}
-                  {cc.stderr ? `\n[stderr]\n${cc.stderr}` : ""}
-                </code>
+                {(cc.stdout?.length > 3000
+                  ? cc.stdout.slice(0, 3000) + "\n… (truncated)"
+                  : cc.stdout) || "(empty output)"}
               </pre>
             )}
-          </details>
-        ))}
+          </div>
+        </details>
+      ))}
     </section>
   );
 }
