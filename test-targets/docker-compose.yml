@@ -1,0 +1,12 @@
+services:
+  clean-target:
+    build:
+      context: .
+      dockerfile: Dockerfile.clean
+    container_name: cis-clean-target
+
+  vulnerable-target:
+    build:
+      context: .
+      dockerfile: Dockerfile.vulnerable
+    container_name: cis-vulnerable-target

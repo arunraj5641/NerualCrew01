@@ -1,0 +1,37 @@
+# Deliberately misconfigured target -- should FAIL most of the ~10 rules.
+# Every misconfiguration below maps 1:1 to a rule in audit_agent/rules.py;
+# see the comment on each line.
+FROM ubuntu:22.04
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        openssh-server sudo procps iproute2 netcat-openbsd \
+    && rm -rf /var/lib/apt/lists/*
+
+# --- CIS-5.2.10 / CIS-5.2.11: SSH root login + password auth both enabled ---
+RUN mkdir -p /run/sshd && \
+    sed -i 's/^#\?PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config && \
+    sed -i 's/^#\?PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config
+
+# --- CIS-5.4.1: no minimum password length policy ---
+RUN sed -i '/^PASS_MIN_LEN/d' /etc/login.defs
+
+# --- CIS-6.1.9: a world-writable file in a sensitive path ---
+RUN touch /usr/bin/oops-world-writable && chmod 777 /usr/bin/oops-world-writable
+
+# --- CIS-6.1.3 / CIS-6.1.4: loose ownership/perms on passwd + shadow ---
+RUN chmod 666 /etc/passwd && chmod 644 /etc/shadow
+
+# --- CIS-3.5.1: no firewall configured at all (ufw/firewalld not installed) ---
+# (intentionally omitted from apt-get install list above)
+
+# --- CIS-1.2.2: no unattended-upgrades package/config at all ---
+# (intentionally omitted)
+
+# --- CIS-6.2.9: an account with an empty password ---
+RUN useradd -m nopass_user && passwd -d nopass_user
+
+# --- CIS-5.3.1: blanket sudoers wildcard ---
+RUN echo 'ALL ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/wildcard && \
+    chmod 440 /etc/sudoers.d/wildcard
+
+CMD ["sh", "-c", "nc -lk -p 4444 0.0.0.0 & sleep infinity"]

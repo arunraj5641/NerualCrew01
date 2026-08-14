@@ -1,0 +1,35 @@
+# Deliberately hardened target -- should PASS (or UNKNOWN for
+# container-incompatible checks like a real netfilter firewall) on
+# nearly every rule. Use this to sanity-check the pipeline end to end
+# without drowning in findings.
+FROM ubuntu:22.04
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        openssh-server unattended-upgrades sudo procps iproute2 \
+    && rm -rf /var/lib/apt/lists/*
+
+# --- SSH hardening ---
+RUN mkdir -p /run/sshd && \
+    sed -i 's/^#\?PermitRootLogin.*/PermitRootLogin no/' /etc/ssh/sshd_config && \
+    sed -i 's/^#\?PasswordAuthentication.*/PasswordAuthentication no/' /etc/ssh/sshd_config
+
+# --- Password policy ---
+RUN sed -i '/^PASS_MIN_LEN/d' /etc/login.defs && \
+    echo 'PASS_MIN_LEN 14' >> /etc/login.defs
+
+# --- File permissions (these are already Ubuntu defaults, set explicitly
+#     so the image is self-documenting) ---
+RUN chown root:root /etc/passwd && chmod 644 /etc/passwd && \
+    chown root:shadow /etc/shadow && chmod 640 /etc/shadow
+
+# --- Automatic updates ---
+RUN echo 'APT::Periodic::Update-Package-Lists "1";' > /etc/apt/apt.conf.d/20auto-upgrades && \
+    echo 'APT::Periodic::Unattended-Upgrade "1";' >> /etc/apt/apt.conf.d/20auto-upgrades
+
+# --- sudoers: no blanket wildcard ---
+RUN echo 'demo ALL=(ALL) /usr/bin/apt-get update' > /etc/sudoers.d/demo && \
+    chmod 440 /etc/sudoers.d/demo
+
+# Keep the container alive without needing sshd actually running -- the
+# audit agent talks to this via `docker exec`, not a network SSH session.
+CMD ["sleep", "infinity"]
