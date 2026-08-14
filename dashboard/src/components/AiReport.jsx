@@ -320,31 +320,8 @@ export default function AiReport({ report }) {
             );
           })}
 
-          {/* Show reasoning preview if available */}
-          {result.reasoning_preview && (
-            <details style={{ marginTop: "20px" }}>
-              <summary style={{ cursor: "pointer", color: "var(--text-muted)", fontSize: "13px" }}>
-                🧠 Show reasoning preview (first 1000 chars)
-              </summary>
-              <pre
-                style={{
-                  fontFamily: "var(--mono)",
-                  fontSize: "11px",
-                  color: "rgba(167,139,250,0.7)",
-                  background: "rgba(167,139,250,0.05)",
-                  border: "1px solid rgba(167,139,250,0.15)",
-                  borderRadius: "8px",
-                  padding: "14px",
-                  marginTop: "10px",
-                  whiteSpace: "pre-wrap",
-                  maxHeight: "220px",
-                  overflowY: "auto",
-                }}
-              >
-                {result.reasoning_preview}
-              </pre>
-            </details>
-          )}
+
+
         </div>
       )}
 
