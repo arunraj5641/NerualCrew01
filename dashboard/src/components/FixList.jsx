@@ -1,21 +1,14 @@
 import { useState } from "react";
 
-function CopyButton({ text }) {
+function CopyBtn({ text }) {
   const [copied, setCopied] = useState(false);
-
-  const handleCopy = async (e) => {
-    e.stopPropagation();
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      /* fallback silent fail */
-    }
+  const copy = async () => {
+    try { await navigator.clipboard.writeText(text); } catch { /**/ }
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
-
   return (
-    <button className={`btn-copy ${copied ? "copied" : ""}`} onClick={handleCopy}>
+    <button className={`btn-copy ${copied ? "copied" : ""}`} onClick={(e) => { e.stopPropagation(); copy(); }}>
       {copied ? "✓ Copied" : "⎘ Copy"}
     </button>
   );
@@ -24,67 +17,68 @@ function CopyButton({ text }) {
 export default function FixList({ report }) {
   const fixList = report.fix_list || [];
 
-  if (fixList.length === 0) {
-    return (
-      <section className="panel">
-        <div className="panel-head">
-          <span className="panel-title"><span className="title-icon">🔧</span>Prioritized Fix List</span>
-        </div>
-        <div style={{ textAlign: "center", padding: "48px 20px", color: "var(--text-dim)" }}>
-          <div style={{ fontSize: "48px", marginBottom: "12px" }}>🎉</div>
-          <p style={{ fontSize: "16px", fontWeight: 600 }}>Nothing to fix!</p>
-          <p style={{ fontSize: "14px", marginTop: "6px" }}>Every checked rule passed or was UNKNOWN.</p>
-        </div>
-      </section>
-    );
-  }
-
   return (
-    <section className="panel">
-      <div className="panel-head">
-        <span className="panel-title"><span className="title-icon">🔧</span>Prioritized Fix List</span>
-        <span style={{ color: "var(--text-dim)", fontSize: "13px" }}>
-          {fixList.length} item{fixList.length !== 1 ? "s" : ""} to remediate
+    <div>
+      <div className="section-hdr">
+        <div className="section-title"><span className="si">🔧</span> Prioritized Fix List</div>
+        <span style={{ color: "var(--text-3)", fontSize: "13px" }}>
+          {fixList.length} item{fixList.length !== 1 ? "s" : ""}
         </span>
       </div>
 
-      <div className="fix-list">
-        {fixList.map((item) => (
-          <div className="fix-card" key={item.priority}>
-            <div className="fix-priority-badge">{item.priority}</div>
-            <div className="fix-body">
-              <div className="fix-title-row">
-                <span className="fix-rule-id">{item.rule_id}</span>
-                {item.category && (
-                  <span className="category-chip">{item.category}</span>
-                )}
-              </div>
-
-              <p className="fix-finding">{item.finding}</p>
-
-              {item.why_it_matters && (
-                <p className="fix-why">
-                  <strong style={{ color: "var(--text)" }}>Why it matters: </strong>
-                  {item.why_it_matters}
-                </p>
-              )}
-
-              {item.fix_command && (
-                <div className="fix-command-wrap">
-                  <pre className="fix-command-pre">{item.fix_command}</pre>
-                  <CopyButton text={item.fix_command} />
-                </div>
-              )}
-
-              {item.evidence_ref && (
-                <p className="fix-ref">
-                  Evidence ref: <span style={{ color: "var(--cyan)" }}>{item.evidence_ref}</span>
-                </p>
-              )}
+      {fixList.length === 0 && (
+        <div className="card">
+          <div className="card-inner">
+            <div className="empty-state">
+              <div className="empty-icon">🎉</div>
+              <p style={{ fontSize: "16px", fontWeight: 700, color: "var(--green)", marginBottom: "6px" }}>Nothing to fix!</p>
+              <p>Every checked rule passed or was UNKNOWN.</p>
             </div>
           </div>
-        ))}
-      </div>
-    </section>
+        </div>
+      )}
+
+      {fixList.map((item) => (
+        <div className="fix-card" key={item.priority}>
+          <div className="fix-num">{item.priority}</div>
+          <div className="fix-body">
+            <div className="fix-meta">
+              <span className="fix-rule">{item.rule_id}</span>
+              {item.category && <span className="cat-chip">{item.category}</span>}
+            </div>
+
+            <p className="fix-finding">{item.finding}</p>
+
+            {item.why_it_matters && (
+              <p className="fix-why">
+                <strong style={{ color: "var(--text)" }}>Why it matters: </strong>
+                {item.why_it_matters}
+              </p>
+            )}
+
+            {item.fix_command && (
+              <div className="terminal">
+                <div className="terminal-header">
+                  <div className="terminal-dots">
+                    <span /><span /><span />
+                  </div>
+                  <div className="terminal-title">bash</div>
+                  <CopyBtn text={item.fix_command} />
+                </div>
+                <div className="terminal-body">
+                  <span className="terminal-prompt">$</span>{item.fix_command}
+                </div>
+              </div>
+            )}
+
+            {item.evidence_ref && (
+              <div style={{ marginTop: "10px", fontSize: "11px", color: "var(--text-3)", fontFamily: "var(--mono)" }}>
+                Evidence ref: <span style={{ color: "var(--cyan)" }}>{item.evidence_ref}</span>
+              </div>
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
   );
 }

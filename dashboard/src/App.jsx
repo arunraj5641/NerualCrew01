@@ -1,183 +1,184 @@
 import { useEffect, useState } from "react";
-import ReportUpload from "./components/ReportUpload.jsx";
 import SummaryCards from "./components/SummaryCards.jsx";
 import FindingsTable from "./components/FindingsTable.jsx";
 import FixList from "./components/FixList.jsx";
 import AiReport from "./components/AiReport.jsx";
 import EvidencePanel from "./components/EvidencePanel.jsx";
+import ReportUpload from "./components/ReportUpload.jsx";
 import "./styles.css";
 
-const TABS = [
-  { id: "overview", label: "Overview",  icon: "📊" },
-  { id: "findings", label: "Findings",  icon: "🔍", countKey: "total" },
-  { id: "fixes",    label: "Fix List",  icon: "🔧", countKey: "fail" },
-  { id: "ai",       label: "AI Report", icon: "🤖" },
-  { id: "evidence", label: "Evidence",  icon: "📋" },
+const NAV = [
+  { id: "overview",  icon: "📊", label: "Overview"  },
+  { id: "findings",  icon: "🔍", label: "Findings",  countKey: "total" },
+  { id: "fixes",     icon: "🔧", label: "Fix List",  countKey: "fail"  },
+  { id: "ai",        icon: "🤖", label: "AI Report" },
+  { id: "evidence",  icon: "📋", label: "Evidence"  },
 ];
 
 export default function App() {
-  const [report, setReport]     = useState(null);
-  const [fileName, setFileName] = useState("");
-  const [error, setError]       = useState("");
-  const [activeTab, setActiveTab] = useState("overview");
-  const [autoLoading, setAutoLoading] = useState(true);
+  const [report, setReport]       = useState(null);
+  const [fileName, setFileName]   = useState("");
+  const [error, setError]         = useState("");
+  const [tab, setTab]             = useState("overview");
+  const [loading, setLoading]     = useState(true);
 
-  // ── Auto-load report.json from the server on mount ──────────────────────
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const res = await fetch("/api/report");
-        if (!res.ok) {
-          const data = await res.json().catch(() => ({}));
-          // 404 just means no report yet — show upload zone, not an error
-          if (res.status !== 404) {
-            setError(data.error || `Server error ${res.status}`);
-          }
-          return;
-        }
-        const data = await res.json();
-        if (data.findings && data.summary) {
-          setReport(data);
-          setFileName("report.json");
-        }
-      } catch (e) {
-        // server not reachable — silent, show upload zone
-        console.warn("Could not auto-load report:", e.message);
-      } finally {
-        setAutoLoading(false);
-      }
-    };
-    load();
-  }, []);
+  /* Auto-load report.json from server */
+  useEffect(() => { fetchReport(); }, []);
 
-  const handleLoaded = (data, name) => {
-    setReport(data);
-    setFileName(name);
+  const fetchReport = async () => {
+    setLoading(true);
     setError("");
-    setActiveTab("overview");
-  };
-
-  const handleError = (msg) => {
-    setError(msg);
-    setReport(null);
+    try {
+      const res  = await fetch("/api/report");
+      const data = await res.json();
+      if (res.ok && data.findings && data.summary) {
+        setReport(data);
+        setFileName("report.json");
+      } else if (res.status !== 404) {
+        setError(data.error || "Failed to load report");
+      }
+    } catch (e) {
+      console.warn("Auto-load failed:", e.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const s     = report?.summary || {};
   const total = (s.PASS || 0) + (s.FAIL || 0) + (s.UNKNOWN || 0);
 
-  // ── Refresh: re-fetch from server ───────────────────────────────────────
-  const handleRefresh = async () => {
-    setAutoLoading(true);
-    setError("");
-    try {
-      const res = await fetch("/api/report");
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || `Error ${res.status}`);
-      setReport(data);
-      setFileName("report.json");
-    } catch (e) {
-      setError(e.message);
-    } finally {
-      setAutoLoading(false);
-    }
+  const getCount = (key) =>
+    key === "total" ? total : key === "fail" ? (s.FAIL || 0) : null;
+
+  /* Topbar label */
+  const PAGE_TITLE = {
+    overview: "Overview",
+    findings: "Findings",
+    fixes:    "Fix List",
+    ai:       "AI Report",
+    evidence: "Evidence Appendix",
   };
 
   return (
-    <div className="app">
-      <header className="header">
-        <div className="header-logo">🛡️</div>
-        <h1>CIS Audit Dashboard</h1>
-        <p className="header-tagline">
-          Automatically loads <code>reports/report.json</code> from the audit
-          agent. Run the agent, then refresh to see results.
-        </p>
-      </header>
+    <>
+      {/* Animated background layers */}
+      <div className="bg-mesh" />
+      <div className="bg-grid" />
 
-      <main>
-        {/* Spinner while auto-loading */}
-        {autoLoading && (
-          <div style={{ textAlign: "center", padding: "80px 0", color: "var(--text-dim)" }}>
-            <div style={{ fontSize: "36px", marginBottom: "16px", animation: "logoFloat 1.5s ease-in-out infinite" }}>⏳</div>
-            <p style={{ fontSize: "15px" }}>Loading report…</p>
-          </div>
-        )}
-
-        {!autoLoading && !report && (
-          <>
-            {error && <div className="error-banner">⚠️ {error}</div>}
-
-            {/* No report on server — offer manual upload as fallback */}
-            <div style={{ textAlign: "center", marginBottom: "12px" }}>
-              <p style={{ color: "var(--text-dim)", fontSize: "14px", marginBottom: "8px" }}>
-                No report found on the server. Run <code>audit-agent</code> to generate one,
-                or upload manually below.
-              </p>
-              <button className="btn btn-ghost btn-sm" onClick={handleRefresh}>
-                🔄 Retry auto-load
-              </button>
+      <div className="shell">
+        {/* ── SIDEBAR ── */}
+        <aside className="sidebar">
+          <div className="sidebar-logo">
+            <div className="logo-icon">🛡️</div>
+            <div className="logo-text">
+              <span className="logo-title">CIS AUDIT</span>
+              <span className="logo-sub">Dashboard</span>
             </div>
+          </div>
 
-            <ReportUpload onLoaded={handleLoaded} onError={handleError} />
-          </>
-        )}
+          {/* Target info */}
+          {report && (
+            <div className="target-pill">
+              <div className="label">Target</div>
+              <div className="value">{report.target || "—"}</div>
+              <div className="meta">{report.transport} · {new Date(report.generated_at).toLocaleDateString()}</div>
+            </div>
+          )}
 
-        {!autoLoading && report && (
-          <>
-            {/* Toolbar */}
-            <div className="toolbar">
-              <span className="file-badge">
-                📄 {fileName || report.target} &nbsp;·&nbsp; {report.transport}
-                &nbsp;·&nbsp; {new Date(report.generated_at).toLocaleString()}
-              </span>
-              <div style={{ display: "flex", gap: "8px" }}>
-                <button className="btn btn-ghost btn-sm" onClick={handleRefresh}>
+          {/* Nav */}
+          <nav className="sidebar-nav">
+            {NAV.map((n) => {
+              const count = getCount(n.countKey);
+              return (
+                <button
+                  key={n.id}
+                  className={`nav-item ${tab === n.id && report ? "active" : ""}`}
+                  onClick={() => report && setTab(n.id)}
+                  disabled={!report}
+                  style={!report ? { opacity: 0.35, cursor: "default" } : {}}
+                >
+                  <span className="nav-icon">{n.icon}</span>
+                  {n.label}
+                  {count != null && count > 0 && (
+                    <span className={`nav-badge ${n.countKey === "fail" ? "fail" : ""}`}>
+                      {count}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </nav>
+
+          <div className="sidebar-footer">
+            <div className="version-chip">
+              v{report?.agent_version || "?"} · allowlist {report?.allowlist_version || "?"}
+            </div>
+          </div>
+        </aside>
+
+        {/* ── MAIN ── */}
+        <div className="main-content">
+          {/* Topbar */}
+          <header className="topbar">
+            <div className="topbar-title">
+              {report && <div className="dot" />}
+              {report ? PAGE_TITLE[tab] : "CIS Audit Dashboard"}
+            </div>
+            <div className="topbar-actions">
+              {error && <span style={{ color: "var(--red)", fontSize: "13px" }}>⚠️ {error}</span>}
+              {report && (
+                <button className="btn btn-ghost btn-sm" onClick={fetchReport}>
                   🔄 Refresh
                 </button>
+              )}
+              {report && (
                 <button className="btn btn-ghost btn-sm" onClick={() => { setReport(null); setError(""); }}>
-                  ↑ Upload different
+                  ↑ Upload
                 </button>
-              </div>
+              )}
             </div>
+          </header>
 
-            {error && <div className="error-banner">⚠️ {error}</div>}
+          {/* Page content */}
+          <main className="page">
+            {/* Loading */}
+            {loading && (
+              <div className="empty-state">
+                <div className="empty-icon" style={{ animation: "aiFloat 1.5s ease-in-out infinite" }}>⏳</div>
+                <p>Loading report…</p>
+              </div>
+            )}
 
-            {/* Tab nav */}
-            <nav className="tabs" role="tablist">
-              {TABS.map((t) => {
-                const count =
-                  t.countKey === "total" ? total
-                  : t.countKey === "fail" ? (s.FAIL || 0)
-                  : null;
-                return (
-                  <button
-                    key={t.id}
-                    className={`tab-btn ${activeTab === t.id ? "active" : ""}`}
-                    onClick={() => setActiveTab(t.id)}
-                    role="tab"
-                    aria-selected={activeTab === t.id}
-                  >
-                    {t.icon} {t.label}
-                    {count != null && (
-                      <span className="tab-count">{count}</span>
-                    )}
+            {/* No report state */}
+            {!loading && !report && (
+              <div className="upload-state">
+                {error && <div className="error-banner" style={{ marginBottom: "20px", maxWidth: "520px" }}>⚠️ {error}</div>}
+                <div className="no-report-msg">
+                  <p>No report found on the server. Run <code>audit-agent</code> to generate one, or upload manually.</p>
+                  <button className="btn btn-ghost btn-sm" onClick={fetchReport} style={{ marginBottom: "20px" }}>
+                    🔄 Retry auto-load
                   </button>
-                );
-              })}
-            </nav>
+                </div>
+                <ReportUpload
+                  onLoaded={(data, name) => { setReport(data); setFileName(name); setTab("overview"); }}
+                  onError={setError}
+                />
+              </div>
+            )}
 
-            {activeTab === "overview"  && <SummaryCards  report={report} />}
-            {activeTab === "findings"  && <FindingsTable report={report} />}
-            {activeTab === "fixes"     && <FixList       report={report} />}
-            {activeTab === "ai"        && <AiReport      report={report} />}
-            {activeTab === "evidence"  && <EvidencePanel report={report} />}
-          </>
-        )}
-      </main>
-
-      <footer className="footer">
-        cis-audit-agent v{report?.agent_version || "?"} &nbsp;·&nbsp;
-        allowlist {report?.allowlist_version || "?"}
-      </footer>
-    </div>
+            {/* Dashboard tabs */}
+            {!loading && report && (
+              <>
+                {tab === "overview"  && <SummaryCards  report={report} />}
+                {tab === "findings"  && <FindingsTable report={report} />}
+                {tab === "fixes"     && <FixList       report={report} />}
+                {tab === "ai"        && <AiReport      report={report} />}
+                {tab === "evidence"  && <EvidencePanel report={report} />}
+              </>
+            )}
+          </main>
+        </div>
+      </div>
+    </>
   );
 }

@@ -1,82 +1,65 @@
 import { useEffect, useRef, useState } from "react";
 
-const R  = 70;   // circle radius
-const CX = 90;   // centre x
-const CY = 90;   // centre y
-const CIRC = 2 * Math.PI * R;
-
-function DonutChart({ pass, fail, unknown }) {
-  const total = pass + fail + unknown || 1;
-
-  const segments = [
-    { value: fail,    color: "#f87171", label: "FAIL" },
-    { value: unknown, color: "#fbbf24", label: "UNKNOWN" },
-    { value: pass,    color: "#22c55e", label: "PASS" },
-  ];
-
-  let offset = 0;
-  const arcs = segments.map((seg) => {
-    const pct   = seg.value / total;
-    const dash  = pct * CIRC;
-    const gap   = CIRC - dash;
-    const rotate = (offset / total) * 360;
-    offset += seg.value;
-    return { ...seg, dash, gap, rotate };
-  });
-
-  return (
-    <div className="donut-wrap">
-      <svg width="180" height="180" viewBox="0 0 180 180">
-        {/* Track */}
-        <circle cx={CX} cy={CY} r={R} fill="none" stroke="#0b1628" strokeWidth="18" />
-        {arcs.map((arc, i) => (
-          <circle
-            key={i}
-            cx={CX} cy={CY} r={R}
-            fill="none"
-            stroke={arc.color}
-            strokeWidth="18"
-            strokeDasharray={`${arc.dash} ${arc.gap}`}
-            strokeDashoffset={0}
-            transform={`rotate(${arc.rotate - 90} ${CX} ${CY})`}
-            strokeLinecap="butt"
-          />
-        ))}
-      </svg>
-      <div className="donut-center">
-        <div className="donut-total">{pass + fail + unknown}</div>
-        <div className="donut-label">rules</div>
-      </div>
-    </div>
-  );
-}
-
-function useCountUp(target, duration = 800) {
-  const [count, setCount] = useState(0);
-  const frame = useRef(null);
-
+/* Animated count-up hook */
+function useCountUp(target, ms = 900) {
+  const [val, setVal] = useState(0);
+  const raf = useRef(null);
   useEffect(() => {
     let start = null;
     const step = (ts) => {
       if (!start) start = ts;
-      const progress = Math.min((ts - start) / duration, 1);
-      setCount(Math.round(progress * target));
-      if (progress < 1) frame.current = requestAnimationFrame(step);
+      const p = Math.min((ts - start) / ms, 1);
+      setVal(Math.round(p * target));
+      if (p < 1) raf.current = requestAnimationFrame(step);
     };
-    frame.current = requestAnimationFrame(step);
-    return () => cancelAnimationFrame(frame.current);
-  }, [target, duration]);
-
-  return count;
+    raf.current = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf.current);
+  }, [target, ms]);
+  return val;
 }
 
-function AnimatedCard({ value, label, icon, cls }) {
-  const count = useCountUp(value);
+/* Animated SVG ring */
+function Ring({ value, total, color, size = 80, stroke = 10 }) {
+  const r    = (size - stroke) / 2;
+  const circ = 2 * Math.PI * r;
+  const pct  = total > 0 ? value / total : 0;
+  const dash = pct * circ;
+
   return (
-    <div className={`summary-card ${cls}`}>
-      <div className="card-icon">{icon}</div>
-      <div className="card-value">{count}</div>
-      <div className="card-label">{label}</div>
+    <svg width={size} height={size} style={{ transform: "rotate(-90deg)" }}>
+      <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="rgba(255,255,255,0.04)" strokeWidth={stroke} />
+      <circle
+        cx={size/2} cy={size/2} r={r}
+        fill="none"
+        stroke={color}
+        strokeWidth={stroke}
+        strokeDasharray={`${dash} ${circ - dash}`}
+        strokeLinecap="round"
+        style={{
+          filter: `drop-shadow(0 0 6px ${color})`,
+          transition: "stroke-dasharray 1s cubic-bezier(.22,.68,0,1.1)",
+        }}
+      />
+    </svg>
+  );
+}
+
+function MetricCard({ value, total, label, icon, color, cls }) {
+  const count = useCountUp(value);
+  const pct   = total > 0 ? Math.round((value / total) * 100) : 0;
+  return (
+    <div className={`metric-card ${cls}`}>
+      <div className="ring-wrap">
+        <Ring value={value} total={total} color={color} />
+        <div className="ring-center">
+          <span className="ring-icon">{icon}</span>
+        </div>
+      </div>
+      <div className="metric-info">
+        <div className="metric-value">{count}</div>
+        <div className="metric-label">{label}</div>
+        <div className="metric-pct">{pct}% of total</div>
+      </div>
     </div>
   );
 }
@@ -87,33 +70,68 @@ export default function SummaryCards({ report }) {
   const pass    = s.PASS    || 0;
   const fail    = s.FAIL    || 0;
   const unknown = s.UNKNOWN || 0;
+  const total   = pass + fail + unknown;
 
   return (
-    <section className="panel">
-      <div className="panel-head">
-        <span className="panel-title"><span className="title-icon">📊</span>Overview</span>
+    <div>
+      {/* Big metric rings */}
+      <div className="metrics-grid" style={{ marginBottom: "16px" }}>
+        <MetricCard value={fail}    total={total} label="FAILED"  icon="⛔" color="#f87171" cls="m-fail"    />
+        <MetricCard value={pass}    total={total} label="PASSED"  icon="✅" color="#34d399" cls="m-pass"    />
+        <MetricCard value={unknown} total={total} label="UNKNOWN" icon="❓" color="#fbbf24" cls="m-unknown" />
       </div>
 
-      <div className="summary-layout">
-        <DonutChart pass={pass} fail={fail} unknown={unknown} />
-
-        <div>
-          <div className="summary-cards">
-            <AnimatedCard value={pass}    label="Passed"  icon="✅" cls="card-pass" />
-            <AnimatedCard value={fail}    label="Failed"  icon="⛔" cls="card-fail" />
-            <AnimatedCard value={unknown} label="Unknown" icon="❓" cls="card-unknown" />
+      {/* Severity breakdown */}
+      <div className="card" style={{ marginBottom: "16px" }}>
+        <div className="card-inner">
+          <div className="card-title">
+            <span className="ct-icon">⚡</span>
+            Failed by Severity
+            <span className="card-subtitle">{fail} total failures</span>
           </div>
-
-          <div className="sev-bar">
-            <span className="sev-bar-label">Failed by severity:</span>
-            {["critical", "high", "medium", "low"].map((s) => (
-              <span key={s} className={`sev-chip ${s}`}>
-                {sev[s] || 0} {s}
-              </span>
+          <div className="sev-grid">
+            {[
+              { key: "critical", label: "Critical", cls: "s-critical" },
+              { key: "high",     label: "High",     cls: "s-high"     },
+              { key: "medium",   label: "Medium",   cls: "s-medium"   },
+              { key: "low",      label: "Low",      cls: "s-low"      },
+            ].map((s2) => (
+              <div key={s2.key} className={`sev-item ${s2.cls}`}>
+                <div className="sev-count">{sev[s2.key] || 0}</div>
+                <div className="sev-name">{s2.label}</div>
+              </div>
             ))}
           </div>
         </div>
       </div>
-    </section>
+
+      {/* Quick stats row */}
+      <div className="card">
+        <div className="card-inner">
+          <div className="card-title">
+            <span className="ct-icon">📈</span>
+            Audit Summary
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "16px" }}>
+            {[
+              { label: "Total Rules", value: total, color: "var(--cyan)" },
+              { label: "Pass Rate",   value: `${total > 0 ? Math.round((pass/total)*100) : 0}%`, color: "var(--green)" },
+              { label: "Fail Rate",   value: `${total > 0 ? Math.round((fail/total)*100) : 0}%`, color: "var(--red)"   },
+            ].map((item) => (
+              <div key={item.label} style={{
+                background: "var(--bg-2)",
+                border: "1px solid var(--border)",
+                borderRadius: "var(--radius-sm)",
+                padding: "16px",
+                textAlign: "center",
+              }}>
+                <div style={{ fontSize: "28px", fontWeight: 900, color: item.color }}>{item.value}</div>
+                <div style={{ fontSize: "11px", color: "var(--text-3)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.08em", marginTop: "4px" }}>{item.label}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
