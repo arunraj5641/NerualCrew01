@@ -17,6 +17,11 @@ import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import OpenAI from "openai";
+import { readFileSync, existsSync } from "fs";
+import { resolve, dirname } from "path";
+import { fileURLToPath } from "url";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const PORT = process.env.PORT || 3001;
 const API_KEY = process.env.NVIDIA_API_KEY || process.env.OPENAI_API_KEY;
@@ -57,6 +62,23 @@ Include ALL findings, preserving every rule_id. Be specific and grounded in the 
 Never invent facts not present in the report.`;
 
 // ── Health ─────────────────────────────────────────────────────────────────
+// ── Auto-serve latest report.json ─────────────────────────────────────────
+app.get("/api/report", (_req, res) => {
+  // Look in ../reports/report.json relative to the server directory
+  const reportPath = resolve(__dirname, "../reports/report.json");
+  if (!existsSync(reportPath)) {
+    return res.status(404).json({
+      error: `No report found at ${reportPath}. Run the audit agent first.`,
+    });
+  }
+  try {
+    const data = JSON.parse(readFileSync(reportPath, "utf8"));
+    res.json(data);
+  } catch (e) {
+    res.status(500).json({ error: `Failed to read report: ${e.message}` });
+  }
+});
+
 app.get("/api/health", (_req, res) => {
   res.json({
     ok: true,
