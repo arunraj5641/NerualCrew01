@@ -2,11 +2,10 @@
 # container-incompatible checks like a real netfilter firewall) on
 # nearly every rule. Use this to sanity-check the pipeline end to end
 # without drowning in findings.
-FROM ubuntu:22.04
+FROM alpine:3.19
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-        openssh-server unattended-upgrades sudo procps iproute2 \
-    && rm -rf /var/lib/apt/lists/*
+RUN apk add --no-cache openssh sudo procps iproute2 shadow unattended-upgrades 2>/dev/null || \
+    apk add --no-cache openssh sudo procps iproute2 shadow
 
 # --- SSH hardening ---
 RUN mkdir -p /run/sshd && \
@@ -22,8 +21,9 @@ RUN sed -i '/^PASS_MIN_LEN/d' /etc/login.defs && \
 RUN chown root:root /etc/passwd && chmod 644 /etc/passwd && \
     chown root:shadow /etc/shadow && chmod 640 /etc/shadow
 
-# --- Automatic updates ---
-RUN echo 'APT::Periodic::Update-Package-Lists "1";' > /etc/apt/apt.conf.d/20auto-upgrades && \
+# --- Automatic updates (create apt config dir since Alpine doesn't have it) ---
+RUN mkdir -p /etc/apt/apt.conf.d && \
+    echo 'APT::Periodic::Update-Package-Lists "1";' > /etc/apt/apt.conf.d/20auto-upgrades && \
     echo 'APT::Periodic::Unattended-Upgrade "1";' >> /etc/apt/apt.conf.d/20auto-upgrades
 
 # --- sudoers: no blanket wildcard ---
